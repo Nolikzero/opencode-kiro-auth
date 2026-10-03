@@ -38,7 +38,19 @@ region, and experimental rollout; registering a model does not grant access.
 See [Kiro's model documentation](https://kiro.dev/docs/models/available-models/)
 and [reasoning configuration](https://kiro.dev/docs/models/effort/).
 
-Install from a local checkout using Bun:
+Install directly from this fork in OpenCode:
+
+```json
+{
+  "plugin": ["github:Nolikzero/opencode-kiro-auth#master"]
+}
+```
+
+The compiled `dist/` entrypoint is committed so GitHub installs do not require
+a build step. After changing source, run `bun run build` and include the
+updated `dist/` files in the same commit.
+
+For local development, install from a checkout using Bun:
 
 ```sh
 bun install
