@@ -29,7 +29,7 @@ models with substantial trial quotas.
 
 ## Updated model support (fork)
 
-> Status: Local model registration verified · Last verified: 2026-10-04
+> Status: GitHub archive installation and model registration verified · Last verified: 2026-10-04
 
 This fork adds Claude Opus 5.5 (2.0x credits) and Claude Sonnet 5.5
 (1.3x credits), including their `-thinking` companions and effort variants.
@@ -42,7 +42,7 @@ Install directly from this fork in OpenCode:
 
 ```json
 {
-  "plugin": ["github:Nolikzero/opencode-kiro-auth#master"]
+  "plugin": ["https://github.com/Nolikzero/opencode-kiro-auth/archive/refs/heads/master.tar.gz"]
 }
 ```
 
