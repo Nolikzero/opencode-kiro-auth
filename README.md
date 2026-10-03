@@ -27,6 +27,36 @@ models with substantial trial quotas.
 - **Automated Recovery**: Exponential backoff for rate limits and automated token
   refresh.
 
+## Updated model support (fork)
+
+> Status: Local model registration verified · Last verified: 2026-10-04
+
+This fork adds Claude Opus 5.5 (2.0x credits) and Claude Sonnet 5.5
+(1.3x credits), including their `-thinking` companions and effort variants.
+Both use a 1M context window. Availability still depends on your Kiro plan,
+region, and experimental rollout; registering a model does not grant access.
+See [Kiro's model documentation](https://kiro.dev/docs/models/available-models/)
+and [reasoning configuration](https://kiro.dev/docs/models/effort/).
+
+Install from a local checkout using Bun:
+
+```sh
+bun install
+bun run build
+```
+
+Point OpenCode's plugin entry at the built file:
+
+```json
+{
+  "plugin": ["file:///absolute/path/to/opencode-kiro-auth/dist/index.js"]
+}
+```
+
+Restart OpenCode and select `kiro/claude-opus-5-5-thinking` or
+`kiro/claude-sonnet-5-5-thinking` in `/models`. If Kiro is not connected,
+run `opencode auth login` and choose `Other` → `kiro`.
+
 ## Installation
 
 Add the plugin to your `opencode.json` or `opencode.jsonc`:

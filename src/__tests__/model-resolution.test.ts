@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { SUPPORTED_MODELS } from '../constants.js'
-import { resolveKiroModel } from '../plugin/models.js'
+import { getContextWindowSize, resolveKiroModel } from '../plugin/models.js'
 
 describe('resolveKiroModel', () => {
   test('resolves newly advertised model slugs', () => {
@@ -23,6 +23,18 @@ describe('resolveKiroModel', () => {
     expect(resolveKiroModel('claude-sonnet-5-thinking')).toBe('claude-sonnet-5')
     expect(resolveKiroModel('claude-sonnet-5-1m')).toBe('claude-sonnet-5-1m')
     expect(resolveKiroModel('claude-sonnet-5-1m-thinking')).toBe('claude-sonnet-5-1m')
+  })
+
+  test('resolves 5.5 models and preserves their full context after resolution', () => {
+    for (const family of ['opus', 'sonnet']) {
+      for (const suffix of ['', '-thinking']) {
+        const model = `claude-${family}-5-5${suffix}`
+        const resolved = resolveKiroModel(model)
+        expect(resolved).toBe(`claude-${family}-5.5`)
+        expect(getContextWindowSize(model)).toBe(1000000)
+        expect(getContextWindowSize(resolved)).toBe(1000000)
+      }
+    }
   })
 
   test('rejects removed qwen3-coder-480b slug', () => {

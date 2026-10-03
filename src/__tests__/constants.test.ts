@@ -11,7 +11,7 @@ describe('isLongContextModel', () => {
   })
 
   test('returns false for standard context models', () => {
-    const standard = SUPPORTED_MODELS.filter((k) => !k.includes('-1m'))
+    const standard = SUPPORTED_MODELS.filter((k) => !k.includes('-1m') && !k.includes('-5-5'))
     expect(standard.length).toBeGreaterThan(0)
     for (const model of standard) {
       expect(isLongContextModel(model)).toBe(false)
