@@ -29,7 +29,7 @@ models with substantial trial quotas.
 
 ## Updated model support (fork)
 
-> Status: GitHub archive installation and model registration verified · Last verified: 2026-10-04
+> Status: GitHub package installation and model registration verified · Last verified: 2026-10-04
 
 This fork adds Claude Opus 5.5 (2.0x credits) and Claude Sonnet 5.5
 (1.3x credits), including their `-thinking` companions and effort variants.
@@ -42,20 +42,21 @@ Install directly from this fork in OpenCode:
 
 ```json
 {
-  "plugin": ["https://github.com/Nolikzero/opencode-kiro-auth/archive/refs/heads/master.tar.gz"]
+  "plugin": ["@zhafron/opencode-kiro-auth@github:Nolikzero/opencode-kiro-auth#master"]
 }
 ```
 
 The compiled `dist/` entrypoint is committed so GitHub installs do not require
-a build step or package preparation scripts. For local commit hooks, run
-`bun x husky` once. After changing source, run `bun run build` and include the
+a build step or package preparation scripts. The `compile` script is named
+so Git dependency installation can use the committed files directly. For local commit hooks, run
+`bun x husky` once. After changing source, run `bun run compile` and include the
 updated `dist/` files in the same commit.
 
 For local development, install from a checkout using Bun:
 
 ```sh
 bun install
-bun run build
+bun run compile
 ```
 
 Point OpenCode's plugin entry at the built file:
