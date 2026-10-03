@@ -2,8 +2,8 @@ import { CodeWhispererStreamingClient } from '@aws/codewhisperer-streaming-clien
 import { KIRO_CONSTANTS } from '../constants.js';
 const clientCache = new Map();
 const KIRO_CLI_MAX_ATTEMPTS = 3;
-export function createSdkClient(auth, region, effort) {
-    const cacheKey = `${region}:${auth.email || 'default'}:${effort || 'none'}`;
+export function createSdkClient(auth, region, effort, effortField = 'output_config') {
+    const cacheKey = `${region}:${auth.email || 'default'}:${effort || 'none'}:${effortField}`;
     const cached = clientCache.get(cacheKey);
     if (cached && cached.token === auth.access && cached.effort === effort) {
         return cached.client;
@@ -11,7 +11,7 @@ export function createSdkClient(auth, region, effort) {
     const token = auth.access;
     const client = new CodeWhispererStreamingClient({
         region,
-        endpoint: `https://q.${region}.amazonaws.com`,
+        endpoint: `https://runtime.${region}.kiro.dev`,
         token: () => Promise.resolve({ token }),
         maxAttempts: KIRO_CLI_MAX_ATTEMPTS,
         retryMode: 'standard',
@@ -20,6 +20,8 @@ export function createSdkClient(auth, region, effort) {
     // Add Kiro-specific headers
     client.middlewareStack.add((next) => async (args) => {
         args.request.headers['x-amzn-kiro-agent-mode'] = 'vibe';
+        if (auth.authMethod === 'idc')
+            args.request.headers.TokenType = 'SSO_OIDC';
         return next(args);
     }, { step: 'build', name: 'addKiroHeaders' });
     // Inject additionalModelRequestFields for effort-based thinking control
@@ -31,7 +33,7 @@ export function createSdkClient(auth, region, effort) {
                 try {
                     const body = JSON.parse(args.request.body);
                     body.additionalModelRequestFields = {
-                        output_config: {
+                        [effortField]: {
                             effort
                         }
                     };

@@ -1,3 +1,4 @@
+import { KiroAuthError } from '../../plugin/errors.js';
 import { summarizeUsage } from '../../plugin/usage.js';
 export class AccountSelector {
     accountManager;
@@ -22,7 +23,7 @@ export class AccountSelector {
             count = this.accountManager.getAccountCount();
         }
         if (count === 0) {
-            throw new Error('No accounts');
+            throw new KiroAuthError('Kiro is not authenticated. Sign in to the Kiro application or run opencode auth login --provider kiro.', 401);
         }
         let acc = this.accountManager.getCurrentOrNext();
         if (!acc) {

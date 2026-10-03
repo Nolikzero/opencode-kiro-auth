@@ -3,6 +3,7 @@ import type { Effort, KiroAuthDetails } from './types.js'
 export declare function createSdkClient(
   auth: KiroAuthDetails,
   region: string,
-  effort?: Effort
+  effort?: Effort,
+  effortField?: 'output_config' | 'reasoning'
 ): CodeWhispererStreamingClient
 export declare function clearSdkClientCache(): void

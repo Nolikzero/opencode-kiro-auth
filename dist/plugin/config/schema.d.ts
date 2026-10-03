@@ -148,6 +148,7 @@ export declare const KiroConfigSchema: z.ZodObject<
     auth_server_port_range: z.ZodDefault<z.ZodNumber>
     usage_tracking_enabled: z.ZodDefault<z.ZodBoolean>
     auto_sync_kiro_cli: z.ZodDefault<z.ZodBoolean>
+    auto_sync_kiro_desktop: z.ZodDefault<z.ZodBoolean>
     enable_log_api_request: z.ZodDefault<z.ZodBoolean>
     /**
      * Default effort level for thinking models. Controls reasoning depth.
@@ -212,6 +213,7 @@ export declare const KiroConfigSchema: z.ZodObject<
     auth_server_port_range: number
     usage_tracking_enabled: boolean
     auto_sync_kiro_cli: boolean
+    auto_sync_kiro_desktop: boolean
     enable_log_api_request: boolean
     auto_effort_mapping: boolean
     web_search_enabled: boolean
@@ -343,6 +345,7 @@ export declare const KiroConfigSchema: z.ZodObject<
     auth_server_port_range?: number | undefined
     usage_tracking_enabled?: boolean | undefined
     auto_sync_kiro_cli?: boolean | undefined
+    auto_sync_kiro_desktop?: boolean | undefined
     enable_log_api_request?: boolean | undefined
     effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | undefined
     auto_effort_mapping?: boolean | undefined

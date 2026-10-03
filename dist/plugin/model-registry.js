@@ -1,4 +1,5 @@
-import { EFFORT_LEVELS, supportsEffort, supportsXHighEffort, THINKING_BUDGETS } from './effort.js';
+import { EFFORT_LEVELS, resolveEffort, supportsEffort, THINKING_BUDGETS } from './effort.js';
+import { registerDiscoveredModels, toOpenCodeModelId } from './model-metadata.js';
 import { resolveKiroModel } from './models.js';
 const TEXT_ONLY = { input: ['text'], output: ['text'] };
 const TEXT_IMAGE = { input: ['text', 'image'], output: ['text'] };
@@ -6,9 +7,10 @@ const MULTIMODAL = { input: ['text', 'image', 'pdf'], output: ['text'] };
 const CONTEXT_200K = { context: 200000, output: 64000 };
 const CONTEXT_1M = { context: 1000000, output: 64000 };
 /**
- * Models Kiro exposes, keyed by the OpenCode-facing model ID.
+ * Offline fallback catalog, keyed by the OpenCode-facing model ID.
  *
- * Anthropic and open-weight models only. Kiro's GPT-5.6 tiers are deliberately
+ * Live catalogs include all models and their reasoning schemas. This fallback
+ * has Anthropic and open-weight models only. Kiro's GPT-5.6 tiers are deliberately
  * absent: they configure reasoning through `reasoning.effort` / `reasoning.mode`
  * rather than `output_config.effort`, so they need their own request path.
  */
@@ -135,7 +137,7 @@ const MODEL_SPECS = {
 function buildVariants(kiroModel) {
     const variants = {};
     for (const level of EFFORT_LEVELS) {
-        if (level === 'xhigh' && !supportsXHighEffort(kiroModel))
+        if (resolveEffort(kiroModel, level) !== level)
             continue;
         variants[level] = { thinkingConfig: { thinkingBudget: THINKING_BUDGETS[level] } };
     }
@@ -150,7 +152,9 @@ function buildVariants(kiroModel) {
  * plugin emits (see streaming/openai-converter.ts). Without them OpenCode
  * silently drops every reasoning chunk and no thinking block is rendered.
  */
-export function buildModelRegistry() {
+export function buildModelRegistry(catalog) {
+    if (catalog !== undefined)
+        return buildDiscoveredRegistry(catalog);
     const models = {};
     for (const [modelID, spec] of Object.entries(MODEL_SPECS)) {
         models[modelID] = {
@@ -173,6 +177,49 @@ export function buildModelRegistry() {
             interleaved: { field: 'reasoning_content' },
             variants: buildVariants(kiroModel)
         };
+    }
+    return models;
+}
+function buildDiscoveredRegistry(catalog) {
+    registerDiscoveredModels(catalog);
+    const models = Object.create(null);
+    for (const model of catalog) {
+        const id = toOpenCodeModelId(model.modelId);
+        const fallback = MODEL_SPECS[id];
+        const rate = model.rateMultiplier !== undefined ? ` (${model.rateMultiplier}x)` : '';
+        const name = model.modelName || fallback?.name || model.modelId;
+        const limit = {
+            context: model.tokenLimits?.maxInputTokens ?? fallback?.limit.context ?? 200000,
+            output: model.tokenLimits?.maxOutputTokens ?? fallback?.limit.output ?? 64000
+        };
+        const suppliedInputs = model.supportedInputTypes
+            ?.map((input) => input.toLowerCase())
+            .filter((input) => ['text', 'image', 'pdf'].includes(input));
+        const modalities = {
+            input: suppliedInputs?.length
+                ? [...new Set(suppliedInputs)]
+                : (fallback?.modalities.input ?? ['text']),
+            output: ['text']
+        };
+        // Native reasoning is rendered using the shared stream. Effort variants are
+        // derived from the API schema, with legacy capabilities as an offline fallback.
+        const nativeReasoning = /^(claude-|gpt-)/.test(model.modelId);
+        models[id] = {
+            name: `${name}${rate}`,
+            limit,
+            modalities,
+            ...(nativeReasoning ? { reasoning: true, interleaved: { field: 'reasoning_content' } } : {})
+        };
+        if (supportsEffort(model.modelId)) {
+            models[`${id}-thinking`] = {
+                name: `${name} Thinking${rate}`,
+                limit,
+                modalities,
+                reasoning: true,
+                interleaved: { field: 'reasoning_content' },
+                variants: buildVariants(model.modelId)
+            };
+        }
     }
     return models;
 }

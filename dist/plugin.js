@@ -1,13 +1,19 @@
 import { tool } from '@opencode-ai/plugin';
 import { KIRO_CONSTANTS } from './constants.js';
 import { AuthHandler } from './core/auth/auth-handler.js';
+import { TokenRefresher } from './core/auth/token-refresher.js';
 import { RequestHandler } from './core/request/request-handler.js';
 import { AccountCache } from './infrastructure/database/account-cache.js';
 import { AccountRepository } from './infrastructure/database/account-repository.js';
 import { AccountManager } from './plugin/accounts.js';
 import { bootstrapAuthIfNeeded } from './plugin/auth-bootstrap.js';
 import { loadConfig } from './plugin/config/index.js';
+import * as logger from './plugin/logger.js';
+import { ModelCatalog } from './plugin/model-catalog.js';
+import { registerDiscoveredModels } from './plugin/model-metadata.js';
 import { buildModelRegistry } from './plugin/model-registry.js';
+import { syncFromKiroCli } from './plugin/sync/kiro-cli.js';
+import { syncFromKiroDesktop } from './plugin/sync/kiro-desktop.js';
 import { formatWebSearchResults, kiroWebSearch } from './plugin/web-search.js';
 const KIRO_PROVIDER_ID = 'kiro';
 // Register Kiro's server-side web search as a custom tool, when enabled and the
@@ -68,8 +74,30 @@ export const createKiroPlugin = (id) => async ({ client, directory }) => {
     const cache = new AccountCache(60000);
     const repository = new AccountRepository(cache);
     const authHandler = new AuthHandler(config, repository);
+    if (config.auto_sync_kiro_desktop) {
+        try {
+            await syncFromKiroDesktop(config.idc_profile_arn);
+        }
+        catch {
+            logger.warn('Kiro Desktop session import failed; use opencode auth login to choose a source');
+        }
+    }
     const accountManager = await AccountManager.loadFromDisk(config.account_selection_strategy);
     authHandler.setAccountManager(accountManager);
+    const tokenRefresher = new TokenRefresher(config, accountManager, syncFromKiroCli, repository);
+    const modelCatalog = new ModelCatalog({
+        accounts: () => accountManager.getAccounts(),
+        auth: async (account, forceRefresh) => {
+            if (forceRefresh) {
+                await tokenRefresher.forceRefresh(account, accountManager.toAuthDetails(account));
+                return accountManager.toAuthDetails(account);
+            }
+            const refreshed = await tokenRefresher.refreshIfNeeded(account, accountManager.toAuthDetails(account), () => { });
+            if (!refreshed.account.isHealthy)
+                throw new Error('Kiro account unavailable');
+            return accountManager.toAuthDetails(refreshed.account);
+        }
+    });
     const requestHandler = new RequestHandler(accountManager, config, repository, client);
     // Compute the base URL once so both the config hook and auth loader use the same value
     const baseURL = KIRO_CONSTANTS.BASE_URL.replace('/generateAssistantResponse', '').replace('{{region}}', config.default_region || 'us-east-1');
@@ -77,7 +105,7 @@ export const createKiroPlugin = (id) => async ({ client, directory }) => {
         config: async (input) => {
             // Ensure there's an auth entry so OpenCode calls the loader on startup.
             // This is a no-op if the entry already exists.
-            bootstrapAuthIfNeeded(id);
+            bootstrapAuthIfNeeded(id, config.auto_sync_kiro_desktop, config.idc_profile_arn);
             if (!input.provider)
                 input.provider = {};
             if (!input.provider[id])
@@ -85,6 +113,12 @@ export const createKiroPlugin = (id) => async ({ client, directory }) => {
             // Always set npm and api — these must be present regardless of whether
             // the user has already defined the provider in their opencode.json.
             input.provider[id].npm = '@ai-sdk/openai-compatible';
+            // The auth loader is skipped when no auth.json entry exists. Keep
+            // requests inside the plugin so missing credentials fail immediately.
+            input.provider[id].options = {
+                ...input.provider[id].options,
+                fetch: (url, init) => requestHandler.handle(url, init, showToast)
+            };
             // Set the base URL at the provider level. OpenCode reads provider.api as
             // model.api.url, which resolveSDK() uses to construct the endpoint URL.
             // Only set if not already overridden by the user.
@@ -92,7 +126,7 @@ export const createKiroPlugin = (id) => async ({ client, directory }) => {
                 input.provider[id].api = baseURL;
             }
             if (!input.provider[id].models) {
-                input.provider[id].models = buildModelRegistry();
+                input.provider[id].models = buildModelRegistry(await modelCatalog.load());
             }
         },
         auth: {
@@ -100,6 +134,15 @@ export const createKiroPlugin = (id) => async ({ client, directory }) => {
             loader: async (getAuth) => {
                 await getAuth();
                 await authHandler.initialize(showToast);
+                // CLI credentials may have been imported after the config hook. Warm
+                // the catalog for the next startup without adding a network wait here.
+                void modelCatalog
+                    .load()
+                    .then((models) => {
+                    if (models)
+                        registerDiscoveredModels(models);
+                })
+                    .catch(() => { });
                 return {
                     apiKey: '',
                     // Provide baseURL explicitly so the @ai-sdk/openai-compatible provider

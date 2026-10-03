@@ -62,6 +62,7 @@ export const KiroConfigSchema = z.object({
     auth_server_port_range: z.number().min(1).max(100).default(10),
     usage_tracking_enabled: z.boolean().default(true),
     auto_sync_kiro_cli: z.boolean().default(true),
+    auto_sync_kiro_desktop: z.boolean().default(true),
     enable_log_api_request: z.boolean().default(false),
     /**
      * Default effort level for thinking models. Controls reasoning depth.
@@ -95,6 +96,7 @@ export const DEFAULT_CONFIG = {
     auth_server_port_range: 10,
     usage_tracking_enabled: true,
     auto_sync_kiro_cli: true,
+    auto_sync_kiro_desktop: true,
     enable_log_api_request: false,
     auto_effort_mapping: true,
     web_search_enabled: true

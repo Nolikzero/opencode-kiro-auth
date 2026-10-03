@@ -1,5 +1,6 @@
 import type { AccountRepository } from '../../infrastructure/database/account-repository'
 import type { AccountManager } from '../../plugin/accounts'
+import { KiroAuthError } from '../../plugin/errors.js'
 import type { ManagedAccount } from '../../plugin/types'
 import { summarizeUsage } from '../../plugin/usage'
 
@@ -34,7 +35,10 @@ export class AccountSelector {
     }
 
     if (count === 0) {
-      throw new Error('No accounts')
+      throw new KiroAuthError(
+        'Kiro is not authenticated. Sign in to the Kiro application or run opencode auth login --provider kiro.',
+        401
+      )
     }
 
     let acc = this.accountManager.getCurrentOrNext()

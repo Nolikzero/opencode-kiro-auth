@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import * as logger from './logger.js'
 import { getCliDbPath } from './sync/kiro-cli-parser.js'
+import { readKiroDesktopSession } from './sync/kiro-desktop.js'
 
 function getOpenCodeAuthPath(): string {
   const dataRoot =
@@ -50,17 +51,21 @@ function writeAuthFile(authPath: string, auth: Record<string, any>): void {
 
 /**
  * OpenCode only calls the auth loader when there is a stored auth entry for the
- * provider in auth.json. The plugin syncs credentials from the Kiro IDE's local
+ * provider in auth.json. The plugin imports credentials from the Kiro IDE token cache or CLI
  * SQLite database, so it doesn't need the user to go through an OAuth flow first.
  *
  * This writes a minimal placeholder entry into auth.json so OpenCode calls the
- * loader on the next startup, where real credentials are synced from Kiro CLI DB.
+ * loader, where real credentials are imported from the local Kiro session.
  */
-export function bootstrapAuthIfNeeded(providerId: string): void {
+export function bootstrapAuthIfNeeded(
+  providerId: string,
+  desktopEnabled = true,
+  profileOverride?: string
+): void {
   try {
     const cliDbPath = getCliDbPath()
-    if (!existsSync(cliDbPath)) {
-      logger.log('Bootstrap: Kiro CLI DB not found, skipping')
+    if (!existsSync(cliDbPath) && !(desktopEnabled && readKiroDesktopSession(profileOverride))) {
+      logger.debug('Bootstrap: no local Kiro session found, skipping')
       return
     }
 

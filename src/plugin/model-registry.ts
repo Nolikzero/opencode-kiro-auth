@@ -1,4 +1,9 @@
-import { EFFORT_LEVELS, supportsEffort, supportsXHighEffort, THINKING_BUDGETS } from './effort.js'
+import { EFFORT_LEVELS, resolveEffort, supportsEffort, THINKING_BUDGETS } from './effort.js'
+import {
+  registerDiscoveredModels,
+  toOpenCodeModelId,
+  type ModelMetadata
+} from './model-metadata.js'
 import { resolveKiroModel } from './models.js'
 
 type Modalities = {
@@ -29,9 +34,10 @@ interface ModelSpec {
 }
 
 /**
- * Models Kiro exposes, keyed by the OpenCode-facing model ID.
+ * Offline fallback catalog, keyed by the OpenCode-facing model ID.
  *
- * Anthropic and open-weight models only. Kiro's GPT-5.6 tiers are deliberately
+ * Live catalogs include all models and their reasoning schemas. This fallback
+ * has Anthropic and open-weight models only. Kiro's GPT-5.6 tiers are deliberately
  * absent: they configure reasoning through `reasoning.effort` / `reasoning.mode`
  * rather than `output_config.effort`, so they need their own request path.
  */
@@ -164,7 +170,7 @@ function buildVariants(kiroModel: string): Record<string, unknown> {
   const variants: Record<string, unknown> = {}
 
   for (const level of EFFORT_LEVELS) {
-    if (level === 'xhigh' && !supportsXHighEffort(kiroModel)) continue
+    if (resolveEffort(kiroModel, level) !== level) continue
     variants[level] = { thinkingConfig: { thinkingBudget: THINKING_BUDGETS[level] } }
   }
 
@@ -180,7 +186,8 @@ function buildVariants(kiroModel: string): Record<string, unknown> {
  * plugin emits (see streaming/openai-converter.ts). Without them OpenCode
  * silently drops every reasoning chunk and no thinking block is rendered.
  */
-export function buildModelRegistry(): Record<string, unknown> {
+export function buildModelRegistry(catalog?: readonly ModelMetadata[]): Record<string, unknown> {
+  if (catalog !== undefined) return buildDiscoveredRegistry(catalog)
   const models: Record<string, unknown> = {}
 
   for (const [modelID, spec] of Object.entries(MODEL_SPECS)) {
@@ -207,5 +214,51 @@ export function buildModelRegistry(): Record<string, unknown> {
     }
   }
 
+  return models
+}
+
+function buildDiscoveredRegistry(catalog: readonly ModelMetadata[]): Record<string, unknown> {
+  registerDiscoveredModels(catalog)
+  const models: Record<string, unknown> = Object.create(null)
+  for (const model of catalog) {
+    const id = toOpenCodeModelId(model.modelId)
+    const fallback = MODEL_SPECS[id]
+    const rate = model.rateMultiplier !== undefined ? ` (${model.rateMultiplier}x)` : ''
+    const name = model.modelName || fallback?.name || model.modelId
+    const limit = {
+      context: model.tokenLimits?.maxInputTokens ?? fallback?.limit.context ?? 200000,
+      output: model.tokenLimits?.maxOutputTokens ?? fallback?.limit.output ?? 64000
+    }
+    const suppliedInputs = model.supportedInputTypes
+      ?.map((input) => input.toLowerCase())
+      .filter((input): input is 'text' | 'image' | 'pdf' =>
+        ['text', 'image', 'pdf'].includes(input)
+      )
+    const modalities: Modalities = {
+      input: suppliedInputs?.length
+        ? [...new Set(suppliedInputs)]
+        : (fallback?.modalities.input ?? ['text']),
+      output: ['text']
+    }
+    // Native reasoning is rendered using the shared stream. Effort variants are
+    // derived from the API schema, with legacy capabilities as an offline fallback.
+    const nativeReasoning = /^(claude-|gpt-)/.test(model.modelId)
+    models[id] = {
+      name: `${name}${rate}`,
+      limit,
+      modalities,
+      ...(nativeReasoning ? { reasoning: true, interleaved: { field: 'reasoning_content' } } : {})
+    }
+    if (supportsEffort(model.modelId)) {
+      models[`${id}-thinking`] = {
+        name: `${name} Thinking${rate}`,
+        limit,
+        modalities,
+        reasoning: true,
+        interleaved: { field: 'reasoning_content' },
+        variants: buildVariants(model.modelId)
+      }
+    }
+  }
   return models
 }

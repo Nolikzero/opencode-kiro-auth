@@ -1,3 +1,4 @@
+import { getModelEffortContract } from './model-metadata.js';
 /**
  * Effort levels ordered from lowest to highest reasoning depth.
  */
@@ -49,13 +50,15 @@ const EFFORT_CAPABLE_MODELS = new Set([
  * Check if a model supports the effort parameter.
  */
 export function supportsEffort(kiroModel) {
-    return EFFORT_CAPABLE_MODELS.has(kiroModel);
+    const contract = getModelEffortContract(kiroModel);
+    return contract ? contract.levels.length > 0 : EFFORT_CAPABLE_MODELS.has(kiroModel);
 }
 /**
  * Check if a model supports xhigh effort level.
  */
 export function supportsXHighEffort(kiroModel) {
-    return XHIGH_CAPABLE_MODELS.has(kiroModel);
+    const contract = getModelEffortContract(kiroModel);
+    return contract ? contract.levels.includes('xhigh') : XHIGH_CAPABLE_MODELS.has(kiroModel);
 }
 /**
  * Resolve effort level for a given model.
@@ -65,6 +68,12 @@ export function supportsXHighEffort(kiroModel) {
 export function resolveEffort(kiroModel, requested) {
     if (!supportsEffort(kiroModel)) {
         return undefined;
+    }
+    const contract = getModelEffortContract(kiroModel);
+    if (contract) {
+        const rank = EFFORT_LEVELS.indexOf(requested);
+        return (contract.levels.find((level) => EFFORT_LEVELS.indexOf(level) >= rank) ??
+            contract.levels.at(-1));
     }
     // xhigh is only supported on the models in XHIGH_CAPABLE_MODELS
     if (requested === 'xhigh' && !supportsXHighEffort(kiroModel)) {

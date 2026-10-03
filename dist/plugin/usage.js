@@ -8,7 +8,7 @@ export async function fetchUsageLimits(auth) {
     ];
     let lastError = null;
     for (const [index, params] of attempts.entries()) {
-        const url = new URL(`https://q.${auth.region}.amazonaws.com/getUsageLimits`);
+        const url = new URL(`https://management.${auth.region}.kiro.dev/Get-Usage-Limits`);
         url.searchParams.set('isEmailRequired', 'true');
         if (params.origin)
             url.searchParams.set('origin', params.origin);
@@ -21,10 +21,12 @@ export async function fetchUsageLimits(auth) {
                 method: 'GET',
                 headers: {
                     Authorization: `Bearer ${auth.access}`,
+                    ...(auth.authMethod === 'idc' ? { TokenType: 'SSO_OIDC' } : {}),
                     'Content-Type': 'application/json',
                     'x-amzn-kiro-agent-mode': 'vibe',
                     'amz-sdk-request': 'attempt=1; max=1'
-                }
+                },
+                signal: AbortSignal.timeout(5000)
             });
             if (!res.ok) {
                 const body = await res.text().catch(() => '');

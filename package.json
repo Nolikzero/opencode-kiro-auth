@@ -1,6 +1,6 @@
 {
   "name": "@zhafron/opencode-kiro-auth",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "OpenCode plugin for AWS Kiro (CodeWhisperer) providing access to Claude models",
   "type": "module",
   "main": "dist/index.js",
@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tickernelz/opencode-kiro-auth.git"
+    "url": "git+https://github.com/Nolikzero/opencode-kiro-auth.git"
   },
   "publishConfig": {
     "access": "public"

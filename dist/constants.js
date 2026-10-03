@@ -35,8 +35,8 @@ export function extractRegionFromArn(arn) {
 export const KIRO_CONSTANTS = {
     REFRESH_URL: 'https://prod.{{region}}.auth.desktop.kiro.dev/refreshToken',
     REFRESH_IDC_URL: 'https://oidc.{{region}}.amazonaws.com/token',
-    BASE_URL: 'https://q.{{region}}.amazonaws.com/generateAssistantResponse',
-    USAGE_LIMITS_URL: 'https://q.{{region}}.amazonaws.com/getUsageLimits',
+    BASE_URL: 'https://runtime.{{region}}.kiro.dev/generateAssistantResponse',
+    USAGE_LIMITS_URL: 'https://management.{{region}}.kiro.dev/Get-Usage-Limits',
     DEFAULT_REGION: 'us-east-1',
     AXIOS_TIMEOUT: 120000,
     USER_AGENT: 'KiroIDE',

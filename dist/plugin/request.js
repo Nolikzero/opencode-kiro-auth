@@ -6,6 +6,7 @@ import { findOriginalToolCall, getContentText, mergeAdjacentMessages } from '../
 import { convertToolsToCodeWhisperer, createToolNameRegistry, deduplicateToolResults } from '../infrastructure/transformers/tool-transformer.js';
 import { getEffectiveEffort } from './effort.js';
 import { convertImagesToKiroFormat, extractAllImages, extractTextFromParts } from './image-handler.js';
+import { getModelEffortContract } from './model-metadata.js';
 import { resolveKiroModel } from './models.js';
 function buildCodeWhispererRequest(body, model, auth, think = false, budget = 20000, showToast) {
     const req = typeof body === 'string' ? JSON.parse(body) : body;
@@ -268,6 +269,7 @@ export function transformToCodeWhisperer(url, body, model, auth, think = false, 
                 'Content-Type': 'application/json',
                 Accept: 'application/json',
                 Authorization: `Bearer ${auth.access}`,
+                ...(auth.authMethod === 'idc' ? { TokenType: 'SSO_OIDC' } : {}),
                 'amz-sdk-invocation-id': crypto.randomUUID(),
                 'amz-sdk-request': 'attempt=1; max=1',
                 'x-amzn-kiro-agent-mode': 'vibe',
@@ -295,6 +297,7 @@ export function transformToSdkRequest(body, model, auth, think = false, budget =
         conversationId: convId,
         region: extractRegionFromArn(auth.profileArn) ?? auth.region,
         toolNameMap,
-        effort
+        effort,
+        effortField: getModelEffortContract(resolved)?.field
     };
 }

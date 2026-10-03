@@ -23,6 +23,7 @@ import {
   extractAllImages,
   extractTextFromParts
 } from './image-handler.js'
+import { getModelEffortContract } from './model-metadata.js'
 import { resolveKiroModel } from './models.js'
 import type {
   CodeWhispererRequest,
@@ -324,6 +325,7 @@ export function transformToCodeWhisperer(
         'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${auth.access}`,
+        ...(auth.authMethod === 'idc' ? { TokenType: 'SSO_OIDC' } : {}),
         'amz-sdk-invocation-id': crypto.randomUUID(),
         'amz-sdk-request': 'attempt=1; max=1',
         'x-amzn-kiro-agent-mode': 'vibe',
@@ -375,6 +377,7 @@ export function transformToSdkRequest(
     conversationId: convId,
     region: extractRegionFromArn(auth.profileArn) ?? auth.region,
     toolNameMap,
-    effort
+    effort,
+    effortField: getModelEffortContract(resolved)?.field
   }
 }

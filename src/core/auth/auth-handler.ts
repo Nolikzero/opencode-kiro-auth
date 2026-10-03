@@ -2,6 +2,7 @@ import type { AuthHook } from '@opencode-ai/plugin'
 import type { AccountRepository } from '../../infrastructure/database/account-repository.js'
 import { RegionSchema } from '../../plugin/config/schema.js'
 import * as logger from '../../plugin/logger.js'
+import { syncFromKiroDesktop } from '../../plugin/sync/kiro-desktop.js'
 import { summarizeUsage } from '../../plugin/usage.js'
 import { UsageTracker } from '../account/usage-tracker.js'
 import { IdcAuthMethod } from './idc-auth-method.js'
@@ -19,6 +20,15 @@ export class AuthHandler {
   ) {}
 
   async initialize(showToast?: ToastFunction): Promise<void> {
+    if (this.config.auto_sync_kiro_desktop) {
+      try {
+        const account = await syncFromKiroDesktop(this.config.idc_profile_arn)
+        if (account) this.accountManager?.addAccount(account)
+        this.repository.invalidateCache()
+      } catch {
+        logger.warn('Kiro Desktop session could not be imported')
+      }
+    }
     const { syncFromKiroCli } = await import('../../plugin/sync/kiro-cli.js')
 
     logger.log('Auth init', { autoSyncKiroCli: !!this.config.auto_sync_kiro_cli })
@@ -212,6 +222,23 @@ export class AuthHandler {
           }
         ],
         authorize: (inputs?: any) => idcMethod.authorize(inputs)
+      },
+      {
+        label: 'Kiro Desktop — use account from the application',
+        type: 'oauth' as const,
+        authorize: async () => {
+          const account = await syncFromKiroDesktop(this.config.idc_profile_arn)
+          if (!account) throw new Error('Sign in to the Kiro Desktop application first.')
+          this.accountManager.addAccount(account)
+          this.repository.invalidateCache()
+          return {
+            url: 'https://kiro.dev/',
+            instructions:
+              'Importing the account already signed in to Kiro Desktop. No browser login is required.',
+            method: 'auto' as const,
+            callback: async () => ({ type: 'success' as const, key: account.accessToken })
+          }
+        }
       }
     ]
   }

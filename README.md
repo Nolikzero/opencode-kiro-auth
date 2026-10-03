@@ -27,16 +27,65 @@ models with substantial trial quotas.
 - **Automated Recovery**: Exponential backoff for rate limits and automated token
   refresh.
 
-## Updated model support (fork)
+## Automatic model discovery (fork)
 
-> Status: GitHub package installation and model registration verified · Last verified: 2026-10-04
+> Status: Live IDE import, Opus 5.5 response, model discovery, and CLI/desktop registration verified · Last verified: 2026-10-04
 
-This fork adds Claude Opus 5.5 (2.0x credits) and Claude Sonnet 5.5
-(1.3x credits), including their `-thinking` companions and effort variants.
-Both use a 1M context window. Availability still depends on your Kiro plan,
-region, and experimental rollout; registering a model does not grant access.
-See [Kiro's model documentation](https://kiro.dev/docs/models/available-models/)
-and [reasoning configuration](https://kiro.dev/docs/models/effort/).
+This fork queries Kiro's `ListAvailableModels` API using your signed-in accounts.
+The API catalog is authoritative: it supplies model IDs, display names, credit
+multipliers, token limits, input modalities, and reasoning configuration schemas. Newly returned IDs, including
+GPT and future Claude versions, are forwarded without updating a hardcoded
+allowlist. Claude IDs retain OpenCode's existing hyphenated spelling.
+
+Model metadata is cached in `~/.config/opencode/kiro-models.json`, separately for
+each account, profile, and region. At startup, snapshots older than 15 minutes
+refresh in the background. A fresh snapshot needs no API request; an expired
+snapshot remains usable while refreshing. The first lookup waits at most 1.5
+seconds, and API requests time out after 4 seconds. Pagination, two concurrent
+account probes, single-flight refreshes, a 60-second failure cooldown, and one
+authentication retry keep startup work bounded. Updated background results are
+used on the next catalog load or restart. Credentials are never written to the
+model cache.
+
+Before sign-in, or when neither the API nor a matching cache is available, the
+bundled model list is retained as a fallback. An explicit
+`provider.kiro.models` override is still respected. Thinking variants and supported effort levels are derived from the API schemas.
+Claude requests use `output_config.effort`; GPT requests use `reasoning.effort`.
+Known legacy capabilities are retained only when the API omits its schema.
+
+The plugin uses Kiro's current native services, matching the installed IDE:
+`management.<region>.kiro.dev/List-Available-Models` for discovery,
+`management.<region>.kiro.dev/Get-Usage-Limits` for usage, and
+`runtime.<region>.kiro.dev/generateAssistantResponse` for generation. Corporate
+OIDC sessions include the `TokenType: SSO_OIDC` header. The old Amazon Q API can
+reject a valid Kiro subscription with “Your subscription does not support this
+application”; a profile ARN alone does not fix that product mismatch.
+
+## Use the account already signed in to Kiro Desktop
+
+Automatic import is enabled by default (`auto_sync_kiro_desktop: true` in
+`~/.config/opencode/kiro.json`). The plugin reads the active session from
+`~/.aws/sso/cache/kiro-auth-token.json`, its matching OIDC registration for
+corporate accounts, and the IDE's selected `profile.json`. It never modifies
+Kiro's source files. Tokens are persisted only in the plugin's existing local
+account database, not in the model metadata cache. Kiro CLI auto-sync continues
+to work independently.
+
+For an explicit choice, run `opencode auth login --provider kiro` and choose
+**Kiro Desktop — use account from the application**. The existing Builder ID and
+Identity Center methods remain available. No browser login is needed for IDE
+import. Corporate users must select a profile in Kiro first (or set
+`idc_profile_arn`); the OIDC region and inference region are handled separately.
+`KIRO_DESKTOP_TOKEN_PATH` and `KIRO_DESKTOP_PROFILE_PATH` override the source paths.
+If no usable account exists, requests return a clear, non-retryable 401 instead
+of sending unauthenticated requests to a generic chat-completions endpoint.
+Model requests honor OpenCode cancellation and the configured request timeout.
+
+Live verification used the signed-in corporate IDE account in `eu-central-1`:
+the catalog returned Auto, Opus 5.5, GPT-5.6 Sol, and GPT-5.6 Luna; Opus 5.5
+returned `OK`, and usage retrieval succeeded. Account-specific governance may
+restrict the list to these approved models. See
+[Kiro model governance](https://kiro.dev/docs/enterprise/governance/model/).
 
 Install directly from this fork in OpenCode:
 
@@ -82,8 +131,8 @@ Add the plugin to your `opencode.json` or `opencode.jsonc`:
 ```
 
 That is the whole configuration. The plugin registers the `kiro` provider and
-advertises every model Kiro exposes, including a `-thinking` companion for each
-model that supports reasoning effort. Run `/models` to pick one.
+advertises the available account catalog after discovery, with `-thinking`
+companions derived from each model’s effort schema. Run `/models` to pick one.
 
 Defining `provider.kiro.models` yourself replaces the plugin's registry entirely.
 Only do that to rename or restrict models, and see the reasoning flags below if
@@ -91,7 +140,7 @@ any of them are `-thinking` models.
 
 ### Thinking Effort Configuration
 
-Every effort-capable Claude model gets a `-thinking` companion, already carrying
+Every discovered effort-capable model gets a `-thinking` companion, already carrying
 the reasoning flags and an effort ladder as variants. Nothing to configure: pick a
 `-thinking` model and cycle its variants to change reasoning depth.
 

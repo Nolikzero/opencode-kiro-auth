@@ -1,3 +1,4 @@
+import { type ModelMetadata } from './model-metadata.js'
 /**
  * Model registry advertised to OpenCode.
  *
@@ -7,4 +8,6 @@
  * plugin emits (see streaming/openai-converter.ts). Without them OpenCode
  * silently drops every reasoning chunk and no thinking block is rendered.
  */
-export declare function buildModelRegistry(): Record<string, unknown>
+export declare function buildModelRegistry(
+  catalog?: readonly ModelMetadata[]
+): Record<string, unknown>

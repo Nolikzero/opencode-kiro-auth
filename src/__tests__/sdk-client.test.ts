@@ -50,11 +50,22 @@ async function captureRequest(client: ReturnType<typeof createSdkClient>) {
 
   return {
     body: JSON.parse(bodyText),
-    request: { headers: capturedRequest.headers, bodyText }
+    request: { headers: capturedRequest.headers, bodyText, hostname: capturedRequest.hostname }
   }
 }
 
 describe('SDK client', () => {
+  test('uses the native Kiro runtime, SSO token type, and GPT reasoning contract', async () => {
+    clearSdkClientCache()
+    const client = createSdkClient(auth(), 'eu-central-1', 'high', 'reasoning')
+    const { body, request } = await captureRequest(client)
+    expect(request.hostname).toBe('runtime.eu-central-1.kiro.dev')
+    expect(request.headers.TokenType).toBe('SSO_OIDC')
+    expect(body.additionalModelRequestFields).toEqual({ reasoning: { effort: 'high' } })
+    const claude = createSdkClient(auth(), 'eu-central-1', 'high', 'output_config')
+    expect(claude).not.toBe(client)
+    clearSdkClientCache()
+  })
   test('uses Kiro CLI-style standard SDK retries for throttling', async () => {
     clearSdkClientCache()
 

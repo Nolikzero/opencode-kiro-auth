@@ -1,4 +1,5 @@
 import { GenerateAssistantResponseCommand } from '@aws/codewhisperer-streaming-client';
+import { KiroAuthError } from '../../plugin/errors.js';
 import { isPermanentError } from '../../plugin/health.js';
 import * as logger from '../../plugin/logger.js';
 import { transformToSdkRequest } from '../../plugin/request.js';
@@ -10,7 +11,7 @@ import { TokenRefresher } from '../auth/token-refresher.js';
 import { ErrorHandler } from './error-handler.js';
 import { ResponseHandler } from './response-handler.js';
 import { RetryStrategy } from './retry-strategy.js';
-const KIRO_API_PATTERN = /^(https?:\/\/)?q\.[a-z0-9-]+\.amazonaws\.com/;
+const KIRO_API_PATTERN = /^https?:\/\/(?:q\.[a-z0-9-]+\.amazonaws\.com|runtime\.[a-z0-9-]+\.kiro\.dev)(?:\/|$)/;
 const REAUTH_FAILURE_COOLDOWN_MS = 60000;
 export class RequestHandler {
     accountManager;
@@ -43,7 +44,20 @@ export class RequestHandler {
         if (!KIRO_API_PATTERN.test(url)) {
             return fetch(input, init);
         }
-        return this.enqueueKiroRequest(() => this.handleKiroRequest(url, init, showToast));
+        try {
+            return await this.enqueueKiroRequest(() => this.handleKiroRequest(url, init, showToast));
+        }
+        catch (error) {
+            if (!(error instanceof KiroAuthError))
+                throw error;
+            return Response.json({
+                error: {
+                    message: error.message,
+                    type: 'authentication_error',
+                    code: 'authentication_required'
+                }
+            }, { status: error.statusCode || 401 });
+        }
     }
     async enqueueKiroRequest(run) {
         const previous = RequestHandler.kiroRequestQueue;
@@ -112,12 +126,15 @@ export class RequestHandler {
                 this.logSdkRequest(sdkPrep, acc, apiTimestamp);
             }
             try {
-                const client = createSdkClient(auth, sdkPrep.region, sdkPrep.effort);
+                const client = createSdkClient(auth, sdkPrep.region, sdkPrep.effort, sdkPrep.effortField);
                 const command = new GenerateAssistantResponseCommand({
                     conversationState: sdkPrep.conversationState,
                     profileArn: sdkPrep.profileArn
                 });
-                const sdkResponse = await client.send(command);
+                const timeout = AbortSignal.timeout(this.config.request_timeout_ms);
+                const sdkResponse = await client.send(command, {
+                    abortSignal: init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
+                });
                 if (apiTimestamp) {
                     this.logSdkResponse(sdkPrep, apiTimestamp);
                 }
@@ -209,10 +226,10 @@ export class RequestHandler {
     logSdkRequest(prep, acc, timestamp) {
         // Mirrors what the sdk-client middleware injects, so logs reflect the wire body.
         const additionalModelRequestFields = prep.effort
-            ? { output_config: { effort: prep.effort } }
+            ? { [prep.effortField || 'output_config']: { effort: prep.effort } }
             : undefined;
         logger.logApiRequest({
-            url: `https://q.${prep.region}.amazonaws.com/generateAssistantResponse`,
+            url: `https://runtime.${prep.region}.kiro.dev/generateAssistantResponse`,
             method: 'POST',
             headers: { 'x-amzn-kiro-agent-mode': 'vibe' },
             body: {
@@ -251,7 +268,7 @@ export class RequestHandler {
         };
         if (!this.config.enable_log_api_request) {
             logger.logApiError({
-                url: `https://q.${prep.region}.amazonaws.com/generateAssistantResponse`,
+                url: `https://runtime.${prep.region}.kiro.dev/generateAssistantResponse`,
                 method: 'POST',
                 headers: {},
                 body: null,
