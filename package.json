@@ -9,8 +9,7 @@
     "build": "tsc -p tsconfig.build.json && node scripts/fix-esm-imports.mjs",
     "format": "prettier --write 'src/**/*.ts'",
     "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "opencode",

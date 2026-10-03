@@ -47,7 +47,8 @@ Install directly from this fork in OpenCode:
 ```
 
 The compiled `dist/` entrypoint is committed so GitHub installs do not require
-a build step. After changing source, run `bun run build` and include the
+a build step or package preparation scripts. For local commit hooks, run
+`bun x husky` once. After changing source, run `bun run build` and include the
 updated `dist/` files in the same commit.
 
 For local development, install from a checkout using Bun:
