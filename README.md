@@ -87,13 +87,18 @@ returned `OK`, and usage retrieval succeeded. Account-specific governance may
 restrict the list to these approved models. See
 [Kiro model governance](https://kiro.dev/docs/enterprise/governance/model/).
 
-Install directly from this fork in OpenCode:
+This plugin supports OpenCode 2 (`@opencode/plugin`) and, through the same package,
+OpenCode 1.18.29+. OpenCode 2 reads the `plugins` key and the `setup()` entrypoint;
+OpenCode 1 reads `plugin` and `server()`. Pick the key that matches your OpenCode:
 
 ```json
 {
-  "plugin": ["@zhafron/opencode-kiro-auth@github:Nolikzero/opencode-kiro-auth#master"]
+  "plugins": ["@zhafron/opencode-kiro-auth@github:Nolikzero/opencode-kiro-auth#master"]
 }
 ```
+
+For OpenCode 1, use `"plugin"` instead of `"plugins"`. See the
+[V1 → V2 plugin migration guide](https://opencode.ai/v2/docs/build/plugins/migrate-v1).
 
 The compiled `dist/` entrypoint is committed so GitHub installs do not require
 a build step or package preparation scripts. The `compile` script is named
@@ -112,7 +117,7 @@ Point OpenCode's plugin entry at the built file:
 
 ```json
 {
-  "plugin": ["file:///absolute/path/to/opencode-kiro-auth/dist/index.js"]
+  "plugins": ["file:///absolute/path/to/opencode-kiro-auth/dist/index.js"]
 }
 ```
 
@@ -126,15 +131,22 @@ Add the plugin to your `opencode.json` or `opencode.jsonc`:
 
 ```json
 {
-  "plugin": ["@zhafron/opencode-kiro-auth"]
+  "plugins": ["@zhafron/opencode-kiro-auth"]
 }
 ```
 
-That is the whole configuration. The plugin registers the `kiro` provider and
+(`"plugin"` on OpenCode 1.) That is the whole configuration. The plugin registers the `kiro` provider and
 advertises the available account catalog after discovery, with `-thinking`
 companions derived from each model’s effort schema. Run `/models` to pick one.
 
-Defining `provider.kiro.models` yourself replaces the plugin's registry entirely.
+On OpenCode 2 the plugin registers the provider and models through the `provider`
+transform, sign-in methods through the `integration` transform, and the web search tool
+through the `tool` transform. The provider is always enabled; credentials live in the
+plugin's own account store, so a missing sign-in is reported when a request is made.
+OpenCode 2 has no server-plugin toast API, so usage and sign-in notices are written to
+`~/.config/opencode/kiro-logs/plugin.log` instead of the TUI.
+
+On OpenCode 1, defining `provider.kiro.models` yourself replaces the plugin's registry entirely.
 Only do that to rename or restrict models, and see the reasoning flags below if
 any of them are `-thinking` models.
 
@@ -231,7 +243,7 @@ path in `opencode.json` or `opencode.jsonc`:
 
 ```json
 {
-  "plugin": ["/path/to/opencode-kiro-auth"]
+  "plugins": ["/path/to/opencode-kiro-auth"]
 }
 ```
 

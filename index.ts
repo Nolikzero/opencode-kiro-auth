@@ -1,4 +1,3 @@
-export { KiroOAuthPlugin, createKiroPlugin } from './src/plugin';
-export { authorizeKiroIDC } from './src/kiro/oauth-idc';
-export type { KiroAuthDetails, KiroAuthMethod, KiroRegion, ManagedAccount } from './src/plugin/types';
-export type { KiroConfig } from './src/plugin/config';
+// Source entrypoint for local checkouts; published installs use dist/index.js.
+export * from './src/index.js'
+export { default } from './src/index.js'

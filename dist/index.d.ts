@@ -1,8 +1,8 @@
+export { KiroV2Plugin } from './plugin-v2.js'
 export { KiroOAuthPlugin } from './plugin.js'
 export type { KiroConfig } from './plugin/config/index.js'
 export type { KiroAuthMethod, KiroRegion, ManagedAccount } from './plugin/types.js'
 declare const _default: {
-  id: string
   server: ({ client, directory }: any) => Promise<{
     config: (input: any) => Promise<void>
     auth: {
@@ -105,5 +105,12 @@ declare const _default: {
     }
     tool: Record<string, any>
   }>
+  id: string
+  setup: (
+    context: import('@opencode/plugin/promise/plugin').Context
+  ) =>
+    | Promise<import('@opencode/plugin/promise/plugin').Cleanup | void>
+    | import('@opencode/plugin/promise/plugin').Cleanup
+    | void
 }
 export default _default
